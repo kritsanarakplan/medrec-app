@@ -1,6 +1,13 @@
+// client/src/App.js
+
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './App.css'; // หากมี CSS
+
+// *** บรรทัดที่ 1: เพิ่มการกำหนด BASE URL ของ API ***
+// ใน Production (บน Render), process.env.REACT_APP_API_URL จะมีค่าเป็น URL ของ Backend
+// ใน Development (บนเครื่องของคุณ), จะใช้ 'http://localhost:5000' ซึ่งจะทำงานร่วมกับ proxy ใน package.json
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function App() {
   const [items, setItems] = useState([]);
@@ -12,9 +19,9 @@ function App() {
   // Function to fetch items from backend
   const fetchItems = async () => {
     try {
-      // ใน Development, "proxy" ใน package.json จะเปลี่ยน /api/items เป็น http://localhost:5000/api/items
-      // ใน Production, จะต้องตั้งค่า Backend API URL ที่ Render
-      const response = await axios.get('/api/items');
+      // *** บรรทัดที่ 2: แก้ไข URL สำหรับเรียก API GET ***
+      // ใช้ API_BASE_URL ที่เรากำหนดไว้
+      const response = await axios.get(`${API_BASE_URL}/api/items`);
       setItems(response.data);
       setError(null); // Clear any previous errors
     } catch (err) {
@@ -34,7 +41,9 @@ function App() {
     }
 
     try {
-      const response = await axios.post('/api/items', {
+      // *** บรรทัดที่ 3: แก้ไข URL สำหรับเรียก API POST ***
+      // ใช้ API_BASE_URL ที่เรากำหนดไว้
+      const response = await axios.post(`${API_BASE_URL}/api/items`, {
         name: newItemName,
         description: newItemDescription,
       });

@@ -13,9 +13,7 @@ const PORT = process.env.PORT || 5000; // ใช้ PORT จาก environment v
 app.use(express.json()); // สำหรับ Parse JSON request bodies
 // CORS configuration - Allow all origins for simplicity in development
 // For production, it's better to restrict to your frontend URL
-app.use(cors({
-    origin: '*' // Allow all origins for now. We'll change this later for production.
-}));
+app.use(cors({ origin: 'https://medred-app-1.onrender.com' }));
 
 // Basic API Route
 app.get('/', (req, res) => {
