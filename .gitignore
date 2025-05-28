@@ -1,0 +1,11 @@
+# Gitignore for my-fullstack-app
+
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+server/.env
+client/.env
