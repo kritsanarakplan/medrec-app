@@ -46,14 +46,120 @@ app.get('/api/items', (req, res) => {
 });
 
 // POST a new item
-app.post('/api/items', (req, res) => {
+app.post('/api/items', async (req, res) => { // <-- เพิ่ม async ตรงนี้
     const newItem = req.body;
     if (!newItem.name) {
         return res.status(400).json({ message: 'Item name is required' });
     }
     newItem.id = items.length > 0 ? Math.max(...items.map(item => item.id)) + 1 : 1;
     items.push(newItem);
-    res.status(201).json(newItem);
+
+    // *** เพิ่มส่วนนี้เพื่อส่ง Flex Message ไปยัง Line ***
+    const targetGroupId = 'Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; // <-- ***แทนที่ด้วย Group ID ของ Line กลุ่มของคุณ***
+    // หรือถ้าจะส่งไปหา User ID ก็เป็น 'Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+    // สร้าง Flex Message JSON สำหรับแจ้งเตือน
+    const notificationFlexMessage = {
+      type: 'flex',
+      altText: `มี Item ใหม่เพิ่มเข้ามา: ${newItem.name}`,
+      contents: {
+        type: 'bubble',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '🎉 มี Item ใหม่เพิ่มเข้ามา 🎉',
+              weight: 'bold',
+              size: 'lg',
+              color: '#1DB446' // สีเขียว
+            },
+            {
+              type: 'separator',
+              margin: 'md'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'ชื่อ:',
+                      color: '#aaaaaa',
+                      size: 'sm',
+                      flex: 1
+                    },
+                    {
+                      type: 'text',
+                      text: newItem.name,
+                      wrap: true,
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 5
+                    }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'baseline',
+                spacing: 'sm',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'รายละเอียด:',
+                    color: '#aaaaaa',
+                    size: 'sm',
+                    flex: 1
+                  },
+                  {
+                    type: 'text',
+                    text: newItem.description || '-', // ถ้าไม่มี description ให้แสดง '-'
+                    wrap: true,
+                    color: '#666666',
+                    size: 'sm',
+                    flex: 5
+                  }
+                ]
+              }
+            ]
+            },
+            {
+              type: 'separator',
+              margin: 'md'
+            },
+            {
+              type: 'button',
+              action: {
+                type: 'uri',
+                label: 'ดูในเว็บไซต์',
+                uri: 'https://medred-app-1.onrender.com' // <-- แทนที่ด้วย URL Frontend ของคุณ
+              },
+              style: 'link',
+              height: 'sm',
+              margin: 'md'
+            }
+          ]
+        }
+      }
+    };
+
+    try {
+      await client.pushMessage(targetGroupId, notificationFlexMessage); // ใช้ pushMessage เพื่อส่งไปที่ Group ID
+      console.log('Flex message sent to Line group successfully!');
+    } catch (lineErr) {
+      console.error('Error sending Flex message to Line:', lineErr);
+    }
+    // *** สิ้นสุดส่วนส่ง Flex Message ***
+
+    res.status(201).json(newItem); // ส่ง Response กลับไปที่ Frontend
 });
 
 
