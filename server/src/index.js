@@ -1,251 +1,269 @@
 const express = require('express');
+const { Pool } = require('pg');
+const line = require('@line/bot-sdk');
 const cors = require('cors');
 require('dotenv').config();
+const app = express();
 
-// *** เพิ่มส่วนนี้สำหรับ Line Bot SDK ***
-const line = require('@line/bot-sdk');
+app.use(cors());
+app.use(express.json());
 
+// Database connection
+const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: 5432,
+});
+
+// LINE Bot configuration
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
-const client = new line.Client(config); // Client สำหรับส่งข้อความ
-// *** สิ้นสุดส่วน Line Bot SDK ***
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+const client = new line.Client(config);
+//const GROUP_ID = 'YOUR_GROUP_ID'; // ID ของกลุ่มไลน์
 
-// *** เปลี่ยนลำดับของ Middleware ตรงนี้ ***
+// API Routes
 
-// 1. เพิ่ม Middleware สำหรับ Line Webhook ก่อน (สำคัญมาก!)
-//    ใช้ app.use() เพื่อให้มันทำงานก่อน Express.json() สำหรับ Path /webhook เท่านั้น
-app.use('/webhook', line.middleware(config));
-
-// 2. express.json() สำหรับ API อื่นๆ (หลัง Line Middleware)
-app.use(express.json());
-
-// 3. CORS Middleware
-app.use(cors({
-    origin: 'https://medred-app-1.onrender.com' // อย่าลืมใส่ URL Frontend ของคุณ
-}));
-
-// Basic API Route
-app.get('/', (req, res) => {
-    res.send('Welcome to the Node.js Backend!');
+// 1. สร้างเวรใหม่และส่งประกาศ
+app.post('/api/shifts/create', async (req, res) => {
+    const { shiftType, requiredPeople } = req.body;
+    
+    try {
+        // บันทึกเวรใหม่
+        const result = await pool.query(
+            'INSERT INTO shifts (shift_type, required_people) VALUES ($1, $2) RETURNING *',
+            [shiftType, requiredPeople]
+        );
+        
+        const shift = result.rows[0];
+        
+        // สร้าง Flex Message
+        const flexMessage = createShiftFlexMessage(shift);
+        
+        // ส่งข้อความไปกลุ่ม
+        await client.pushMessage(GROUP_ID, flexMessage);
+        
+        res.json({ success: true, shift });
+    } catch (error) {
+        console.error('Error creating shift:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// Example API for data (in-memory for now)
-let items = [
-    { id: 1, name: 'Item A', description: 'This is item A' },
-    { id: 2, name: 'Item B', description: 'This is item B' },
-];
-
-// GET all items
-app.get('/api/items', (req, res) => {
-    res.json(items);
+// 2. สมัครเวร
+app.post('/api/shifts/:shiftId/apply', async (req, res) => {
+    const { shiftId } = req.params;
+    const { userId, displayName } = req.body;
+    
+    try {
+        // ตรวจสอบว่าสมัครแล้วหรือยัง
+        const existingApplication = await pool.query(
+            'SELECT * FROM shift_applications WHERE shift_id = $1 AND user_id = $2',
+            [shiftId, userId]
+        );
+        
+        if (existingApplication.rows.length > 0) {
+            return res.status(400).json({ error: 'คุณสมัครเวรนี้แล้ว' });
+        }
+        
+        // บันทึกการสมัคร
+        await pool.query(
+            'INSERT INTO shift_applications (shift_id, user_id, display_name) VALUES ($1, $2, $3)',
+            [shiftId, userId, displayName]
+        );
+        
+        res.json({ success: true, message: 'สมัครเวรสำเร็จ' });
+    } catch (error) {
+        console.error('Error applying for shift:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// POST a new item
-app.post('/api/items', async (req, res) => { // <-- เพิ่ม async ตรงนี้
-    const newItem = req.body;
-    if (!newItem.name) {
-        return res.status(400).json({ message: 'Item name is required' });
-    }
-    newItem.id = items.length > 0 ? Math.max(...items.map(item => item.id)) + 1 : 1;
-    items.push(newItem);
-
-    // *** เพิ่มส่วนนี้เพื่อส่ง Flex Message ไปยัง Line ***
-    const targetGroupId = 'Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; // <-- ***แทนที่ด้วย Group ID ของ Line กลุ่มของคุณ***
-    // หรือถ้าจะส่งไปหา User ID ก็เป็น 'Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-
-    // สร้าง Flex Message JSON สำหรับแจ้งเตือน
-    const notificationFlexMessage = {
-      type: 'flex',
-      altText: `มี Item ใหม่เพิ่มเข้ามา: ${newItem.name}`,
-      contents: {
-        type: 'bubble',
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: '🎉 มี Item ใหม่เพิ่มเข้ามา 🎉',
-              weight: 'bold',
-              size: 'lg',
-              color: '#1DB446' // สีเขียว
-            },
-            {
-              type: 'separator',
-              margin: 'md'
-            },
-            {
-              type: 'box',
-              layout: 'vertical',
-              margin: 'lg',
-              spacing: 'sm',
-              contents: [
-                {
-                  type: 'box',
-                  layout: 'baseline',
-                  spacing: 'sm',
-                  contents: [
-                    {
-                      type: 'text',
-                      text: 'ชื่อ:',
-                      color: '#aaaaaa',
-                      size: 'sm',
-                      flex: 1
-                    },
-                    {
-                      type: 'text',
-                      text: newItem.name,
-                      wrap: true,
-                      color: '#666666',
-                      size: 'sm',
-                      flex: 5
-                    }
-                ]
-              },
-              {
-                type: 'box',
-                layout: 'baseline',
-                spacing: 'sm',
-                contents: [
-                  {
-                    type: 'text',
-                    text: 'รายละเอียด:',
-                    color: '#aaaaaa',
-                    size: 'sm',
-                    flex: 1
-                  },
-                  {
-                    type: 'text',
-                    text: newItem.description || '-', // ถ้าไม่มี description ให้แสดง '-'
-                    wrap: true,
-                    color: '#666666',
-                    size: 'sm',
-                    flex: 5
-                  }
-                ]
-              }
-            ]
-            },
-            {
-              type: 'separator',
-              margin: 'md'
-            },
-            {
-              type: 'button',
-              action: {
-                type: 'uri',
-                label: 'ดูในเว็บไซต์',
-                uri: 'https://medred-app-1.onrender.com' // <-- แทนที่ด้วย URL Frontend ของคุณ
-              },
-              style: 'link',
-              height: 'sm',
-              margin: 'md'
-            }
-          ]
-        }
-      }
-    };
-
-    try {
-      await client.pushMessage(targetGroupId, notificationFlexMessage); // ใช้ pushMessage เพื่อส่งไปที่ Group ID
-      console.log('Flex message sent to Line group successfully!');
-    } catch (lineErr) {
-      console.error('Error sending Flex message to Line:', lineErr);
-    }
-    // *** สิ้นสุดส่วนส่ง Flex Message ***
-
-    res.status(201).json(newItem); // ส่ง Response กลับไปที่ Frontend
+// 3. สุ่มคนได้เวร
+app.post('/api/shifts/:shiftId/random', async (req, res) => {
+    const { shiftId } = req.params;
+    
+    try {
+        // ดึงข้อมูลเวร
+        const shiftResult = await pool.query('SELECT * FROM shifts WHERE id = $1', [shiftId]);
+        const shift = shiftResult.rows[0];
+        
+        if (!shift) {
+            return res.status(404).json({ error: 'ไม่พบเวรนี้' });
+        }
+        
+        // ดึงผู้สมัครทั้งหมด
+        const applicationsResult = await pool.query(
+            'SELECT * FROM shift_applications WHERE shift_id = $1',
+            [shiftId]
+        );
+        
+        const applications = applicationsResult.rows;
+        
+        if (applications.length === 0) {
+            return res.status(400).json({ error: 'ไม่มีผู้สมัครเวรนี้' });
+        }
+        
+        // สุ่มคนได้เวร (ไม่ซ้ำ)
+        const selectedCount = Math.min(shift.required_people, applications.length);
+        const shuffled = applications.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, selectedCount);
+        
+        // บันทึกผลการสุ่ม
+        for (const person of selected) {
+            await pool.query(
+                'INSERT INTO shift_assignments (shift_id, user_id, display_name) VALUES ($1, $2, $3)',
+                [shiftId, person.user_id, person.display_name]
+            );
+        }
+        
+        // อัพเดทสถานะเวร
+        await pool.query('UPDATE shifts SET status = $1 WHERE id = $2', ['completed', shiftId]);
+        
+        // ลบข้อมูลการสมัคร
+        await pool.query('DELETE FROM shift_applications WHERE shift_id = $1', [shiftId]);
+        
+        // ส่งผลการสุ่มไปกลุ่ม
+        const resultMessage = createResultMessage(shift, selected);
+        await client.pushMessage(GROUP_ID, resultMessage);
+        
+        res.json({ success: true, selected });
+    } catch (error) {
+        console.error('Error randomizing shift:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-
-// *** ส่วนของ Line Webhook Endpoint (ไม่ต้องมี middleware ตรงนี้แล้ว เพราะย้ายไปข้างบนแล้ว) ***
-app.post('/webhook', (req, res) => { // ลบ 'middleware' ออกจากตรงนี้
-  // เมื่อ Line ส่ง Event มาที่นี่
-  console.log('Line Webhook Event:', JSON.stringify(req.body.events));
-
-  // Array ของ Promise ที่จะ Resolve ด้วยการ Handle แต่ละ Event
-  const events = req.body.events;
-  Promise
-    .all(events.map(handleEvent))
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error(err);
-      res.status(500).end();
-    });
+// 4. Webhook สำรับ LINE Bot
+app.post('/webhook', line.middleware(config), (req, res) => {
+     const events = req.body.events;
+  events.forEach(event => {
+    console.log('event.source:', event.source);
+  });
+    Promise
+        .all(req.body.events.map(handleEvent))
+        .then((result) => res.json(result))
+        .catch((err) => {
+            console.error(err);
+            res.status(500).end();
+        });
 });
 
-// ฟังก์ชันสำหรับ Handle แต่ละ Event จาก Line
+// จัดการ Event จาก LINE
 async function handleEvent(event) {
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    // ถ้าไม่ใช่ข้อความ หรือไม่ใช่ข้อความแบบ text ไม่ต้องทำอะไร
-    return Promise.resolve(null);
-  }
-
-  const receivedText = event.message.text.toLowerCase();
-  let replyMessage = { type: 'text', text: 'ฉันไม่เข้าใจคำสั่งของคุณ' }; // ข้อความตอบกลับเริ่มต้น
-
-  if (receivedText === 'flex message') {
-    // *** นี่คือส่วนที่คุณจะสร้าง Flex Message JSON ***
-    const flexMessage = {
-      "type": "flex",
-      "altText": "นี่คือ Flex Message ตัวอย่าง", // ข้อความที่จะแสดงเมื่อ Flex Message ไม่แสดง
-      "contents": {
-        "type": "bubble",
-        "body": {
-          "type": "box",
-          "layout": "vertical",
-          "contents": [
-            {
-              "type": "text",
-              "text": "Hello, Flex Message!",
-              "weight": "bold",
-              "size": "xl"
-            },
-            {
-              "type": "text",
-              "text": "นี่คือข้อความจาก Flex Message ครับ"
-            },
-            {
-              "type": "button",
-              "action": {
-                "type": "uri",
-                "label": "ไปที่ Google",
-                "uri": "https://www.google.com"
-              },
-              "style": "primary",
-              "margin": "md"
-            }
-          ]
-        }
-      }
-    };
-    // *** สิ้นสุดส่วนสร้าง Flex Message JSON ***
-
-    return client.replyMessage(event.replyToken, flexMessage); // ส่ง Flex Message กลับ
-  } else if (receivedText === 'hello') {
-    replyMessage = { type: 'text', text: 'สวัสดีครับ!' };
-    return client.replyMessage(event.replyToken, replyMessage);
-  } else if (receivedText === 'items') {
-      // ดึงรายการ Items จาก API ของตัวเอง (ถ้าต้องการ)
-      // หรือจะแค่ตอบเป็นข้อความธรรมดาก็ได้
-      const itemsList = items.map(item => `${item.name}: ${item.description}`).join('\n');
-      replyMessage = { type: 'text', text: `รายการ Items ที่มี:\n${itemsList || 'ยังไม่มีรายการ'}` };
-      return client.replyMessage(event.replyToken, replyMessage);
-  }
-
-
-  // สำหรับข้อความอื่นๆ หรือถ้าไม่มีเงื่อนไขใดๆ ตรง
-  return client.replyMessage(event.replyToken, replyMessage);
+    if (event.type !== 'postback') return Promise.resolve(null);
+    
+    const data = new URLSearchParams(event.postback.data);
+    const action = data.get('action');
+    const shiftId = data.get('shiftId');
+    
+    if (action === 'apply') {
+        try {
+            const response = await fetch(`${process.env.BASE_URL}/api/shifts/${shiftId}/apply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: event.source.userId,
+                    displayName: await getDisplayName(event.source.userId)
+                })
+            });
+            
+            const result = await response.json();
+            
+            return client.replyMessage(event.replyToken, {
+                type: 'text',
+                text: result.success ? 'สมัครเวรสำเร็จ! ✅' : result.error
+            });
+        } catch (error) {
+            return client.replyMessage(event.replyToken, {
+                type: 'text',
+                text: 'เกิดข้อผิดพลาดในการสมัครเวร'
+            });
+        }
+    }
 }
-// *** สิ้นสุดส่วนของ Line Webhook Endpoint ***
 
+// ฟังก์ชันสร้าง Flex Message
+function createShiftFlexMessage(shift) {
+    return {
+        type: 'flex',
+        altText: `รับสมัครเวร ${shift.shift_type}`,
+        contents: {
+            type: 'bubble',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                    {
+                        type: 'text',
+                        text: '📢 รับสมัครเวร',
+                        weight: 'bold',
+                        size: 'xl',
+                        color: '#00B900'
+                    }
+                ]
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                    {
+                        type: 'text',
+                        text: `ประเภท: ${shift.shift_type}`,
+                        size: 'md',
+                        weight: 'bold'
+                    },
+                    {
+                        type: 'text',
+                        text: `จำนวนที่รับ: ${shift.required_people} คน`,
+                        size: 'sm',
+                        color: '#666666'
+                    }
+                ]
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        action: {
+                            type: 'postback',
+                            label: '🙋‍♂️ สมัครเวร',
+                            data: `action=apply&shiftId=${shift.id}`
+                        }
+                    }
+                ]
+            }
+        }
+    };
+}
 
-// Start the server
+// ฟังก์ชันสร้างข้อความผลการสุ่ม
+function createResultMessage(shift, selected) {
+    const names = selected.map(p => p.display_name).join(', ');
+    return {
+        type: 'text',
+        text: `🎉 ผลการสุ่มเวร ${shift.shift_type}\n\nผู้ได้รับเวร:\n${names}\n\nขอแสดงความยินดี! 👏`
+    };
+}
+
+// ฟังก์ชันดึงชื่อผู้ใช้
+async function getDisplayName(userId) {
+    try {
+        const profile = await client.getProfile(userId);
+        return profile.displayName;
+    } catch (error) {
+        return 'Unknown User';
+    }
+}
+
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
