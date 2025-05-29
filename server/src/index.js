@@ -4,6 +4,13 @@ const line = require('@line/bot-sdk');
 const cors = require('cors');
 require('dotenv').config();
 const app = express();
+
+// LINE Bot configuration
+const config = {
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
+};
+
 app.use('/webhook', line.middleware(config));
 app.use(cors());
 app.use(express.json());
@@ -17,11 +24,7 @@ const pool = new Pool({
     port: 5432,
 });
 
-// LINE Bot configuration
-const config = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
-};
+
 
 const client = new line.Client(config);
 //const GROUP_ID = 'YOUR_GROUP_ID'; // ID ของกลุ่มไลน์
