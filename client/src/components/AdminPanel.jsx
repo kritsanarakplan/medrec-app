@@ -8,22 +8,23 @@ const AdminPanel = () => {
         requiredPeople: 1
     });
     const [loading, setLoading] = useState(false);
-    const [shifts, setShifts] = useState([]); // State สำหรับเก็บรายการเวรที่จัดกลุ่มแล้ว
-    const [randomizingShiftId, setRandomizingShiftId] = useState(null);
+    const [shifts, setShifts] = useState([]); // State สำหรับเก็บรายการเวรที่ดึงมา
+    const [randomizingShiftId, setRandomizingShiftId] = useState(null); // State สำหรับ track ว่ากำลังสุ่มเวรไหนอยู่
 
+    // Effect hook เพื่อดึงข้อมูลเวรเมื่อ component โหลดครั้งแรก
     useEffect(() => {
         fetchShifts();
     }, []);
-
+    
+    // ฟังก์ชันสำหรับดึงข้อมูลเวรทั้งหมด
     const fetchShifts = async () => {
         setLoading(true);
         try {
+            // สมมติว่ามี API endpoint สำหรับดึงรายการเวรทั้งหมด เช่น /api/shifts
             const response = await fetch(`${API_BASE_URL}/api/shifts`);
             if (response.ok) {
-                const rawData = await response.json();
-                // จัดกลุ่มข้อมูลที่ได้จาก API ให้เป็นโครงสร้างที่ใช้งานง่าย
-                const groupedShifts = groupShiftsWithApplications(rawData);
-                setShifts(groupedShifts);
+                const data = await response.json();
+                setShifts(data);
             } else {
                 alert('เกิดข้อผิดพลาดในการดึงข้อมูลเวร');
             }
@@ -35,39 +36,7 @@ const AdminPanel = () => {
         }
     };
 
-    // ฟังก์ชันสำหรับจัดกลุ่มข้อมูลเวรกับผู้สมัคร
-    const groupShiftsWithApplications = (data) => {
-        const shiftsMap = new Map();
-
-        data.forEach(item => {
-            const shiftId = item.id;
-            if (!shiftsMap.has(shiftId)) {
-                // ถ้ายังไม่มีเวรนี้ใน Map ให้สร้าง Object ของเวรขึ้นมา
-                shiftsMap.set(shiftId, {
-                    id: item.id,
-                    shift_type: item.shift_type,
-                    required_people: item.required_people,
-                    status: item.status,
-                    created_at: item.created_at,
-                    applications: [] // เตรียม Array สำหรับเก็บผู้สมัคร
-                });
-            }
-            // เพิ่มข้อมูลผู้สมัครเข้าไปใน Array applications ของเวรนั้นๆ
-            // ตรวจสอบให้แน่ใจว่ามีข้อมูลผู้สมัคร (บางครั้ง JOIN อาจคืนค่า null ถ้าไม่มีผู้สมัคร)
-            if (item.user_id && item.display_name) {
-                shiftsMap.get(shiftId).applications.push({
-                    application_id: item.application_id, // ถ้ามีคอลัมน์นี้
-                    user_id: item.user_id,
-                    display_name: item.display_name,
-                    applied_at: item.applied_at
-                });
-            }
-        });
-
-        // แปลง Map เป็น Array ของ Object เพื่อให้ React map ได้
-        return Array.from(shiftsMap.values()).sort((a, b) => b.id - a.id); // เรียงจาก ID ล่าสุด
-    };
-
+    // ฟังก์ชันสำหรับสร้างเวรใหม่
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -95,6 +64,7 @@ const AdminPanel = () => {
         }
     };
 
+    // ฟังก์ชันสำหรับสุ่มผู้สมัครเวร
     const handleRandomizeShift = async (shiftId) => {
         if (window.confirm('คุณแน่ใจหรือไม่ที่จะสุ่มผู้สมัครสำหรับเวรนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้')) {
             setRandomizingShiftId(shiftId);
@@ -110,7 +80,7 @@ const AdminPanel = () => {
                     const result = await response.json();
                     const selectedNames = result.selected.map(p => p.display_name).join(', ');
                     alert(`สุ่มผู้สมัครเวรสำเร็จ! ผู้ที่ได้รับเลือก: ${selectedNames || 'ไม่มี'}`);
-                    fetchShifts(); // อัพเดทรายการเวรหลังจากสุ่มสำเร็จ
+                    fetchShifts(); // อัพเดทรายการเวรหลังจากสุ่มสำเร็จ (สถานะจะเปลี่ยนเป็น completed)
                 } else {
                     const errorData = await response.json();
                     alert('เกิดข้อผิดพลาดในการสุ่มเวร: ' + (errorData.error || 'ไม่ทราบข้อผิดพลาด'));
@@ -175,20 +145,20 @@ const AdminPanel = () => {
                         border: 'none',
                         borderRadius: '4px',
                         cursor: loading ? 'not-allowed' : 'pointer',
-                        marginBottom: '30px'
+                        marginBottom: '30px' // เพิ่ม margin ด้านล่างเพื่อแยกจากส่วนรายการเวร
                     }}
                 >
                     {loading ? 'กำลังสร้าง...' : 'สร้างเวรและส่งประกาศ'}
                 </button>
             </form>
 
-            ---
+            <hr style={{ margin: '40px 0' }} />
 
-            <h2>รายการเวรทั้งหมด</h2>
+            <h2>รายการเวรที่เปิดอยู่</h2>
             {loading && shifts.length === 0 ? (
                 <p>กำลังโหลดข้อมูลเวร...</p>
             ) : shifts.length === 0 ? (
-                <p>ยังไม่มีเวร</p>
+                <p>ยังไม่มีเวรที่เปิดอยู่</p>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                     {shifts.map((shift) => (
@@ -196,34 +166,18 @@ const AdminPanel = () => {
                             border: '1px solid #eee',
                             borderRadius: '8px',
                             padding: '15px',
-                            boxShadow: '0 2px 4px rgba[0,0,0,0.1]',
-                            backgroundColor: shift.status === 'completed' ? '#f0f0f0' : 'white'
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            backgroundColor: shift.status === 'completed' ? '#f0f0f0' : 'white' // เปลี่ยนสีถ้าสุ่มแล้ว
                         }}>
                             <h3>{shift.shift_type}</h3>
-                            <p><strong>รหัสเวร:</strong> {shift.id}</p>
+                            <p><strong>รหัสเวร:</strong> {shift.shifts_id}</p>
                             <p><strong>ต้องการ:</strong> {shift.required_people} คน</p>
-                            <p><strong>สถานะ:</strong> {shift.status === 'open' ? 'เปิดรับสมัคร' : 'สุ่มเสร็จสิ้น'}</p>
-
-                            {/* แสดงรายชื่อผู้สมัคร */}
-                            <div style={{ marginTop: '10px' }}>
-                                <h4>ผู้ลงสมัคร ({shift.applications.length} คน):</h4>
-                                {shift.applications.length > 0 ? (
-                                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: '0' }}>
-                                        {shift.applications.map((app) => (
-                                            <li key={app.user_id + '_' + shift.id} style={{ fontSize: '0.9em', color: '#666' }}> {/* ใช้ user_id + shift.id เป็น key เพื่อความไม่ซ้ำ */}
-                                                {app.display_name} (สมัครเมื่อ: {new Date(app.applied_at).toLocaleString('th-TH')})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p style={{ fontSize: '0.9em', color: '#999' }}>ยังไม่มีผู้สมัคร</p>
-                                )}
-                            </div>
-
-                            {shift.status === 'open' && (
+                            <p><strong>สถานะ:</strong> {shift.status === 'recruiting' ? 'เปิดรับสมัคร' : 'สุ่มเสร็จสิ้น'}</p>
+                        
+                            {shift.status === 'recruiting' && ( // แสดงปุ่มสุ่มเฉพาะเวรที่ยังเปิดอยู่
                                 <button
                                     onClick={() => handleRandomizeShift(shift.id)}
-                                    disabled={randomizingShiftId === shift.id || shift.applications.length < shift.required_people}
+                                    disabled={randomizingShiftId === shift.id}
                                     style={{
                                         width: '100%',
                                         padding: '10px',
@@ -231,20 +185,15 @@ const AdminPanel = () => {
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '4px',
-                                        cursor: (randomizingShiftId === shift.id || shift.applications.length < shift.required_people) ? 'not-allowed' : 'pointer',
-                                        marginTop: '15px'
+                                        cursor: randomizingShiftId === shift.id ? 'not-allowed' : 'pointer',
+                                        marginTop: '10px'
                                     }}
                                 >
                                     {randomizingShiftId === shift.id ? 'กำลังสุ่ม...' : 'สุ่มผู้สมัครเวร'}
                                 </button>
                             )}
-                            {shift.status === 'open' && shift.applications.length < shift.required_people && (
-                                <p style={{ color: 'orange', fontSize: '0.85em', marginTop: '5px' }}>
-                                    (ผู้สมัครไม่ครบจำนวนที่ต้องการ)
-                                </p>
-                            )}
                             {shift.status === 'completed' && (
-                                <p style={{ color: '#555', fontStyle: 'italic', marginTop: '15px' }}>เวรนี้สุ่มเสร็จสิ้นแล้ว</p>
+                                <p style={{ color: '#555', fontStyle: 'italic', marginTop: '10px' }}>เวรนี้สุ่มเสร็จสิ้นแล้ว</p>
                             )}
                         </div>
                     ))}

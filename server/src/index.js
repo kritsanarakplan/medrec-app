@@ -92,7 +92,7 @@ app.post('/api/shifts/:shiftId/apply', async (req, res) => {
 // ดึงข้อมูลเวร
 app.get('/api/shifts', async (req, res) => {
     try {
-        const shiftsResult = await pool.query('SELECT *FROM shifts JOIN shift_applications ON shifts.id = shift_applications.shift_id'); // ดึงเวรทั้งหมด เรียงตาม ID ล่าสุด
+        const shiftsResult = await pool.query('SELECT *FROM shifts'); // ดึงเวรทั้งหมด เรียงตาม ID ล่าสุด
         res.json(shiftsResult.rows);
     } catch (error) {
         console.error('Error fetching shifts:', error);
