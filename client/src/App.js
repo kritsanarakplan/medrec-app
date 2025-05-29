@@ -56,7 +56,7 @@ function App() {
     <Container className="py-4">
       <h1 className="text-center my-4 text-secondary">My React-Node App with Bootstrap</h1>
 
-      {error && <Alert variant="danger" className="text-center">{error}</Alert>}
+      
       
         <Row className="justify-content-md-center mb-4">
           <Col md={10}>
@@ -64,35 +64,6 @@ function App() {
           </Col>
         </Row>
 
-
-      <Row className="justify-content-md-center">
-        <Col md={8} lg={6}>
-          {/* เรียกใช้ ItemForm Component */}
-          <ItemForm onAddItem={handleAddItem} />
-        </Col>
-      </Row> 
-
-      <Row className="justify-content-md-center mt-5">
-        <Col md={8} lg={6}>
-          <div className="p-4 border rounded shadow-sm bg-white">
-            <h2 className="text-center mb-4 text-secondary">Items List</h2>
-            {items.length === 0 ? (
-              <p className="text-center text-muted">No items found. Add some using the form above!</p>
-            ) : (
-              <ListGroup>
-                {items.map((item) => (
-                  <ListGroup.Item key={item.id} className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h5 className="mb-1">{item.name}</h5>
-                      <p className="mb-0 text-muted">{item.description}</p>
-                    </div>
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            )}
-          </div>
-        </Col>
-      </Row>
     </Container>
   );
 }

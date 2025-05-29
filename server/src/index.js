@@ -187,6 +187,7 @@ async function handleEvent(event) {
                 text: result.success ? 'สมัครเวรสำเร็จ! ✅' : result.error
             });
         } catch (error) {
+            console.log(error)
             return client.replyMessage(event.replyToken, {
                 type: 'text',
                 text: 'เกิดข้อผิดพลาดในการสมัครเวร'
