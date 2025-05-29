@@ -1,6 +1,6 @@
 const line = require('@line/bot-sdk');
 const { pool } = require('../config/database');
-
+require('dotenv').config();
 class LineService {
     constructor() {
         this.client = new line.Client({
