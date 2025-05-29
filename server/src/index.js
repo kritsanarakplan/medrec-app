@@ -22,12 +22,16 @@ const pool = new Pool({
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: 5432,
+      ssl: {
+    rejectUnauthorized: false // จำเป็นสำหรับ Render หรือบริการ Cloud PostgreSQL ส่วนใหญ่
+                              // หากต้องการความปลอดภัยสูงสุดใน Production ควรใช้ CA certificate
+  }
 });
 
 
 
 const client = new line.Client(config);
-//const GROUP_ID = 'YOUR_GROUP_ID'; // ID ของกลุ่มไลน์
+const GROUP_ID = process.env.GROUP_ID; // ID ของกลุ่มไลน์
 
 // API Routes
 

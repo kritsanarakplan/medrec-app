@@ -6,13 +6,13 @@ import axios from 'axios';
 
 // Import ItemForm Component
 import ItemForm from './components/ItemForm';
-
+import AdminPanel from './components/AdminPanel';
 // Import Bootstrap Components สำหรับ Layout หลัก
 import { Container, Row, Col, ListGroup, Spinner, Alert } from 'react-bootstrap';
 
 
 // ต้องมี API_BASE_URL เหมือนเดิม (ที่เคยแก้ไขไปแล้ว)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://medrec-app.onrender.com';
 
 function App() {
   const [items, setItems] = useState([]);
@@ -57,13 +57,20 @@ function App() {
       <h1 className="text-center my-4 text-secondary">My React-Node App with Bootstrap</h1>
 
       {error && <Alert variant="danger" className="text-center">{error}</Alert>}
+      
+        <Row className="justify-content-md-center mb-4">
+          <Col md={10}>
+            <AdminPanel />
+          </Col>
+        </Row>
+
 
       <Row className="justify-content-md-center">
         <Col md={8} lg={6}>
           {/* เรียกใช้ ItemForm Component */}
           <ItemForm onAddItem={handleAddItem} />
         </Col>
-      </Row>
+      </Row> 
 
       <Row className="justify-content-md-center mt-5">
         <Col md={8} lg={6}>
