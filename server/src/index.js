@@ -4,7 +4,7 @@ const line = require('@line/bot-sdk');
 const cors = require('cors');
 require('dotenv').config();
 const app = express();
-
+app.use('/webhook', line.middleware(config));
 app.use(cors());
 app.use(express.json());
 
@@ -139,7 +139,8 @@ app.post('/api/shifts/:shiftId/random', async (req, res) => {
 });
 
 // 4. Webhook สำรับ LINE Bot
-app.post('/webhook', line.middleware(config), (req, res) => {
+app.post('/webhook', (req, res) => {
+    console.log('Line Webhook Event:', JSON.stringify(req.body.events));
      const events = req.body.events;
   events.forEach(event => {
     console.log('event.source:', event.source);
