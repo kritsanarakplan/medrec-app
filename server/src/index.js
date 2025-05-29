@@ -19,12 +19,12 @@ const pool = new Pool({
 
 // LINE Bot configuration
 const config = {
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-    channelSecret: process.env.LINE_CHANNEL_SECRET,
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
 const client = new line.Client(config);
-const GROUP_ID = 'YOUR_GROUP_ID'; // ID ของกลุ่มไลน์
+//const GROUP_ID = 'YOUR_GROUP_ID'; // ID ของกลุ่มไลน์
 
 // API Routes
 
