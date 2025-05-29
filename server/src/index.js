@@ -37,13 +37,13 @@ const GROUP_ID = process.env.GROUP_ID; // ID ของกลุ่มไลน�
 
 // 1. สร้างเวรใหม่และส่งประกาศ
 app.post('/api/shifts/create', async (req, res) => {
-    const { shiftType, requiredPeople } = req.body;
+    const { shiftType, requiredPeople,displayName } = req.body;
     
     try {
         // บันทึกเวรใหม่
         const result = await pool.query(
-            'INSERT INTO shifts (shift_type, required_people) VALUES ($1, $2) RETURNING *',
-            [shiftType, requiredPeople]
+            'INSERT INTO shifts (shift_type, required_people,created_by) VALUES ($1, $2, $3) RETURNING *',
+            [shiftType, requiredPeople,displayName]
         );
         
         const shift = result.rows[0];
@@ -86,6 +86,16 @@ app.post('/api/shifts/:shiftId/apply', async (req, res) => {
         res.json({ success: true, message: 'สมัครเวรสำเร็จ' });
     } catch (error) {
         console.error('Error applying for shift:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// ดึงข้อมูลเวร
+app.get('/api/shifts', async (req, res) => {
+    try {
+        const shiftsResult = await pool.query('SELECT * FROM shifts ORDER BY id DESC'); // ดึงเวรทั้งหมด เรียงตาม ID ล่าสุด
+        res.json(shiftsResult.rows);
+    } catch (error) {
+        console.error('Error fetching shifts:', error);
         res.status(500).json({ error: error.message });
     }
 });
